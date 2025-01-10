@@ -1,0 +1,113 @@
+from database.DB_connect import DBConnect
+from model.Gene import Gene
+
+class DAO():
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def getAllGenes():
+        conn = DBConnect.get_connection()
+
+        result = []
+
+        cursor = conn.cursor(dictionary=True)
+        query = """select * from genes"""
+
+        cursor.execute(query)
+
+        for row in cursor:
+            result.append(Gene(**row))
+
+        cursor.close()
+        conn.close()
+        return result
+
+    @staticmethod
+    def getAllChromosomes():
+        conn = DBConnect.get_connection()
+
+        result = []
+
+        cursor = conn.cursor(dictionary=True)
+        query = """select distinct Chromosome from genes where Chromosome>0"""
+
+        cursor.execute(query)
+
+        for row in cursor:
+            result.append(row['Chromosome'])
+
+        cursor.close()
+        conn.close()
+        return result
+
+    @staticmethod
+    def getGeneInteractions():
+        conn = DBConnect.get_connection()
+        result = []
+        cursor = conn.cursor(dictionary=True)
+
+        query = """
+        SELECT i.GeneID1, i.GeneID2, i.Expression_Corr, g1.Chromosome AS Chromosome1, g2.Chromosome AS Chromosome2
+        FROM interactions i, genes g1, genes g2
+        WHERE i.GeneID1 = g1.GeneID
+          AND i.GeneID2 = g2.GeneID
+          AND g1.Chromosome > 0
+          AND g2.Chromosome > 0
+        """
+        cursor.execute(query)
+
+        for row in cursor:
+            result.append({
+                'GeneID1': row['GeneID1'],
+                'GeneID2': row['GeneID2'],
+                'Expression_Corr': row['Expression_Corr'],
+                'Chromosome1': row['Chromosome1'],
+                'Chromosome2': row['Chromosome2']
+            })
+
+        cursor.close()
+        conn.close()
+        return result
+
+    @staticmethod
+    def getEdges(c1, c2):
+        conn = DBConnect.get_connection()
+
+        result = []
+
+        cursor = conn.cursor(dictionary=True)
+        query = ("""select g1.chromosome c1, g2.chromosome c2, g1.geneId g1, g2.geneId g2, i.Expression_corr ec
+                    from genes g1, genes g2, interactions i 
+                    where g1.geneID = i.GeneID1 and g2.GeneID = i.GeneID2 
+                    and g1.chromosome = %s and g2.chromosome = %s
+                    """)
+        cursor.execute(query, (c1, c2))
+
+        for row in cursor:
+            result.append((row["c1"], row["c2"], row["g1"], row["g2"], row["ec"]))
+
+        cursor.close()
+        conn.close()
+        return result
+
+    @staticmethod
+    def getPeso(c1, c2):
+        conn = DBConnect.get_connection()
+
+        result = []
+
+        cursor = conn.cursor()
+        query = ("""select sum(distinct i.Expression_Corr) as peso
+                    from genes g1, genes g2, interactions i 
+                    where g1.geneID = i.GeneID1 and g2.GeneID = i.GeneID2 
+                    and g1.chromosome = %s and g2.chromosome = %s
+                        """)
+        cursor.execute(query, (c1, c2))
+
+        for row in cursor:
+            result.append(row[0])
+
+        cursor.close()
+        conn.close()
+        return result[0]

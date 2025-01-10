@@ -1,0 +1,118 @@
+import networkx as nx
+
+from database.DAO import DAO
+
+
+class Model:
+    def __init__(self):
+        self._grafo = nx.DiGraph()
+        self._nodes = []
+        self.solBest = []
+
+    def buildGraph(self):
+        self._grafo.clear()
+
+        listCromosomi = DAO.getAllChromosomes()
+        for c in listCromosomi:
+            self._nodes.append(c)
+        self._grafo.add_nodes_from(self._nodes)
+
+        for u in self._grafo.nodes():
+            for v in self._grafo.nodes():
+                if u != v:
+                    peso_arco = DAO.getPeso(u, v)
+
+                    if (DAO.getEdges(u, v)): # controllo prima che esista un arco tra i due nodi (tabella non nulla)
+                        self._grafo.add_edge(u, v, weight=peso_arco)
+
+    def getDetails(self):
+        # Otteniamo il numero di nodi e archi
+        nNodes = self._grafo.number_of_nodes()
+        nEdges = self._grafo.number_of_edges()
+
+        # Troviamo il peso minimo e massimo degli archi
+        edge_weights = [data['weight'] for u, v, data in self._grafo.edges(data=True)]
+
+        min_weight = min(edge_weights) if edge_weights else None
+        max_weight = max(edge_weights) if edge_weights else None
+
+        # Visualizziamo i dettagli
+        return nNodes, nEdges, min_weight, max_weight
+
+    def countEdgesByThreshold(self, threshold):
+        count_below = 0
+        count_above = 0
+
+        # Itera su tutti gli archi e conta quelli con peso < soglia e > soglia
+        for u, v, data in self._grafo.edges(data=True):
+            weight = data['weight']
+            if weight < threshold:
+                count_below += 1
+            elif weight > threshold:
+                count_above += 1
+
+        return count_below, count_above
+
+
+    def searchPath(self, t):
+        # Per ogni nodo nel grafo, avvia la ricerca del cammino
+        for n in self.get_nodes():
+            partial = []
+            partial_edges = []
+
+            partial.append(n)  # Inizia il cammino con il nodo corrente
+            self.ricorsione(partial, partial_edges, t)  # Esegui la ricerca ricorsiva
+
+
+    def ricorsione(self, partial, partial_edges, t):
+        n_last = partial[-1]
+        neigh = self.getAdmissibleNeighbs(n_last, partial_edges, t)
+
+        # Se non ci sono vicini ammissibili, confrontiamo il cammino corrente con il migliore trovato finora
+        if len(neigh) == 0:
+            weight_path = self.computeWeightPath(partial_edges)
+            weight_path_best = self.computeWeightPath(self.solBest)
+            if weight_path > weight_path_best:  # Se il cammino corrente è migliore
+                self.solBest = partial_edges[:]  # Salviamo il nuovo cammino migliore
+            return
+
+        # Esplora i vicini ammissibili
+        for n in neigh:
+            partial.append(n)
+            partial_edges.append((n_last, n, self._grafo.get_edge_data(n_last, n)))
+            self.ricorsione(partial, partial_edges, t)
+            partial.pop()
+            partial_edges.pop()
+
+    def getAdmissibleNeighbs(self, n_last, partial_edges, t):
+        all_neigh = self._grafo.edges(n_last, data=True)
+        result = []
+        for e in all_neigh:
+            if e[2]["weight"] > t:  # Se il peso dell'arco è maggiore della soglia
+                e_inv = (e[1], e[0], e[2])  # Consideriamo anche l'arco inverso
+                if (e_inv not in partial_edges) and (e not in partial_edges):  # Evitiamo cicli
+                    result.append(e[1])  # Aggiungiamo il vicino
+        return result
+
+    def computeWeightPath(self, mylist):
+        weight = 0
+        for e in mylist:
+            weight += e[2]['weight']  # Sommiamo i pesi degli archi nel cammino
+        return weight
+
+    def count_edges(self, t):
+        count_bigger = 0
+        count_smaller = 0
+        for x in self.get_edges():
+            if x[2]['weight'] > t:
+                count_bigger += 1
+            elif x[2]['weight'] < t:
+                count_smaller += 1
+        return count_bigger, count_smaller
+
+
+    def get_edges(self):
+        return list(self._grafo.edges(data=True))
+
+    def get_nodes(self):
+        return self._grafo.nodes()

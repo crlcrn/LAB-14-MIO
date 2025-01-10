@@ -1,0 +1,53 @@
+import flet as ft
+
+from database.DAO import DAO
+
+
+class Controller:
+    def __init__(self, view, model):
+        # the view, with the graphical elements of the UI
+        self._view = view
+        # the model, which implements the logic of the program and holds the data
+        self._model = model
+
+    def handle_graph(self, e):
+
+        self._model.buildGraph()
+        nNodes, nEdges, min_weight, max_weight= self._model.getDetails()
+        self._view.txt_result.controls.append(ft.Text(f'Numero di vertici: {nNodes}, numero di archi: {nEdges}'))
+
+        if min_weight is not None and max_weight is not None:
+            self._view.txt_result.controls.append(ft.Text(f'Peso minimo degli archi: {min_weight}'))
+            self._view.txt_result.controls.append(ft.Text(f'Peso massimo degli archi: {max_weight}'))
+        else:
+            self._view.txt_result.controls.append(ft.Text('Nessun arco disponibile per calcolare i pesi.'))
+
+        # Aggiorna la vista per mostrare i nuovi dati
+        self._view.update_page()
+
+    def handle_countedges(self, e):
+        # Recupera il valore della soglia S
+        soglia = float(self._view.txt_name.value)
+
+        # Conta gli archi con peso < soglia e > soglia
+        count_below, count_above = self._model.countEdgesByThreshold(soglia)
+
+        # Mostra il risultato
+        self._view.txt_result.controls.append(ft.Text(f'Archi con peso < {soglia}: {count_below}'))
+        self._view.txt_result.controls.append(ft.Text(f'Archi con peso > {soglia}: {count_above}'))
+
+        self._view.update_page()
+
+    def handle_search(self, e):
+        soglia = float(self._view.txt_name.value)
+
+        # Avvia la ricerca del cammino più lungo con la soglia data
+        self._model.searchPath(soglia)
+
+        # Mostra il cammino migliore trovato
+        self._view.txt_result.controls.append(ft.Text(f'Cammino più lungo trovato con peso > {soglia}:'))
+        self._view.txt_result.controls.append(ft.Text(f'Sequenza di cromosomi: {self._model.solBest}'))
+        self._view.txt_result.controls.append(
+            ft.Text(f'Peso totale: {self._model.computeWeightPath(self._model.solBest)}'))
+
+        self._view.update_page()
